@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "converte_wallet"
+version = "0.1.0"
+description = "Lightweight, provider-agnostic currency conversion library for Python"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+redis  = ["redis>=4.0"]
+server = ["fastapi>=0.100", "uvicorn>=0.23"]
+dev    = ["pytest>=7.0", "pytest-cov>=4.0"]
+all    = ["converte_wallet[redis,server]"]
+
+[project.scripts]
+converte = "converte_wallet.cli:main"
+
+[tool.setuptools]
+packages = ["converte_wallet", "converte_wallet.providers"]
+
+[tool.setuptools.package-dir]
+"converte_wallet"           = "app"
+"converte_wallet.providers" = "app/providers"
