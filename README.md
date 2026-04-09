@@ -1,391 +1,275 @@
-# converte_wallet
+# converte-wallet
 
-> **Статус: в разработке** — API ядра активно пишется, интерфейсы ещё могут меняться.
+<p align="center">
+  <a href="https://pypi.org/project/converte-wallet/">
+    <img src="https://img.shields.io/pypi/v/converte-wallet?color=blue&label=PyPI" alt="PyPI version">
+  </a>
+  <a href="https://pypi.org/project/converte-wallet/">
+    <img src="https://img.shields.io/pypi/pyversions/converte-wallet" alt="Python versions">
+  </a>
+  <a href="https://pypi.org/project/converte-wallet/">
+    <img src="https://img.shields.io/pypi/dm/converte-wallet?color=green" alt="Downloads">
+  </a>
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License">
+  <img src="https://img.shields.io/badge/статус-в%20разработке-orange" alt="Status">
+</p>
 
-Лёгкая Python-библиотека для конвертации валют. Работает из коробки — без регистрации и API-ключей. Поддерживает 150+ валют включая криптовалюты.
+<p align="center">
+  Лёгкая Python-библиотека для конвертации валют.<br>
+  Работает без регистрации и API-ключей. 150+ валют, включая криптовалюты.
+</p>
 
 ```python
-from app import Converter
+from converte_wallet import Converter
 
 c = Converter()
-print(c.convert(1, "RUB", "BTC"))    # 1 рубль в биткоин
-print(c.convert(100, "USD", "EUR"))  # 100 долларов в евро
-print(c.convert(0.5, "ETH", "RUB")) # 0.5 эфира в рубли
+print(c.convert(1, "RUB", "BTC"))    # 1 рубль → биткоин
+print(c.convert(100, "USD", "EUR"))  # 100 долларов → евро
+print(c.convert(0.5, "ETH", "RUB")) # 0.5 эфира → рубли
 ```
-
----
-
-## Содержание
-
-- [Установка](#установка)
-- [Быстрый старт](#быстрый-старт)
-- [Все методы Converter](#все-методы-converter)
-- [Провайдеры курсов](#провайдеры-курсов)
-- [Объект ConversionResult](#объект-conversionresult)
-- [Кэширование](#кэширование)
-- [CLI — командная строка](#cli--командная-строка)
-- [Использование в проектах](#использование-в-проектах)
-- [Разработка и тесты](#разработка-и-тесты)
-- [Структура проекта](#структура-проекта)
 
 ---
 
 ## Установка
 
-### Клонировать репозиторий
-
 ```bash
-git clone https://github.com/your-username/converte_wallet.git
-cd converte_wallet
+pip install converte-wallet
 ```
 
-### Установить зависимости
+Зависимости: только `requests`. Поддерживается Python 3.9+.
 
-```bash
-pip install requests
-```
+---
 
-Или через файл зависимостей:
+## Содержание
 
-```bash
-pip install -r requirements
-```
-
-### Установить как пакет (для импорта из других проектов)
-
-```bash
-pip install -e .
-```
-
-После этого в любом Python-файле на этой машине можно писать:
-
-```python
-from converte_wallet import Converter
-```
-
-> Без `pip install -e .` импорт работает только из корня репозитория как `from app import Converter`.
+- [Быстрый старт](#быстрый-старт)
+- [Все методы](#все-методы)
+- [Провайдеры курсов](#провайдеры-курсов)
+- [ConversionResult](#conversionresult)
+- [Кэширование](#кэширование)
+- [CLI](#cli)
+- [Интеграция в проекты](#интеграция-в-проекты)
+- [Разработка](#разработка)
 
 ---
 
 ## Быстрый старт
 
-### Одна конвертация
+### Базовая конвертация
 
 ```python
-from app import Converter
+from converte_wallet import Converter
 
-c = Converter()  # по умолчанию — бесплатный провайдер, не нужен ключ
+c = Converter()  # бесплатно, без ключей, работает сразу
 
 result = c.convert(100, "USD", "EUR")
-
-print(result.amount)       # 85.75 — сколько EUR получилось
-print(result.rate)         # 0.8575 — курс 1 USD = ? EUR
-print(result.from_currency)  # USD
-print(result.to_currency)    # EUR
-print(result.provider)     # currency-api
-print(result)              # красивый вывод одной строкой
+print(result.amount)   # 85.75
+print(result.rate)     # 0.8575
+print(result)          # 85.75 EUR  (1 USD = 0.8575 EUR, via currency-api)
 ```
 
 ### Рубль в биткоин
 
 ```python
-from app import Converter
-
-c = Converter()
 result = c.convert(1, "RUB", "BTC")
 print(result)
 # 0.00000018 BTC  (1 RUB = 1.79e-07 BTC, via currency-api)
 ```
 
-### Криптовалюта в фиат
+### Крипта в фиат
 
 ```python
-result = c.convert(1, "BTC", "RUB")
-print(result)
-# 5586205.94 RUB  (1 BTC = 5586205 RUB, via currency-api)
-
-result = c.convert(2, "ETH", "USD")
-print(result)
-# 4364.94 USD  (1 ETH = 2182.47 USD, via currency-api)
+print(c.convert(1,   "BTC", "RUB"))  # 1 BTC → рубли
+print(c.convert(2,   "ETH", "USD"))  # 2 ETH → доллары
+print(c.convert(100, "SOL", "EUR"))  # 100 SOL → евро
 ```
 
-### Пакетная конвертация нескольких пар сразу
+### Пакетная конвертация
 
 ```python
-from app import Converter
-
-c = Converter()
 results = c.convert_many([
     (100,  "USD", "EUR"),
     (1,    "RUB", "BTC"),
     (0.5,  "ETH", "USD"),
     (1000, "JPY", "CNY"),
 ])
-
 for r in results:
     print(r)
 ```
 
-### Только курс без конвертации
-
-```python
-rate = c.get_rate("USD", "RUB")
-print(f"1 USD = {rate} RUB")
-```
-
----
-
-## Все методы Converter
-
-### `Converter(provider=None, cache_ttl=3600)`
-
-Создать конвертер.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `provider` | `BaseProvider` | `CurrencyAPIProvider()` | Провайдер курсов |
-| `cache_ttl` | `int` | `3600` | Время жизни кэша в секундах. `0` — без кэша |
-
-```python
-from app import Converter
-from app.providers import CoinGeckoProvider, FrankfurterProvider
-
-# по умолчанию — CurrencyAPIProvider, 150+ валют, бесплатно
-c = Converter()
-
-# конкретный провайдер
-c = Converter(provider=CoinGeckoProvider())
-
-# кэш на 10 минут
-c = Converter(cache_ttl=600)
-
-# без кэша (каждый раз свежий запрос)
-c = Converter(cache_ttl=0)
-```
-
----
-
-### `convert(amount, from_currency, to_currency) → ConversionResult`
-
-Конвертировать сумму.
-
-```python
-result = c.convert(1000, "RUB", "USD")
-result = c.convert(0.01, "BTC", "EUR")
-result = c.convert(1,    "rub", "btc")  # регистр не важен
-```
-
----
-
-### `convert_many(conversions) → List[ConversionResult]`
-
-Конвертировать несколько пар за один вызов.
-
-```python
-results = c.convert_many([
-    (100, "USD", "EUR"),
-    (1,   "BTC", "RUB"),
-    (50,  "GBP", "JPY"),
-])
-```
-
----
-
-### `get_rate(from_currency, to_currency) → float`
-
-Получить только курс.
+### Только курс
 
 ```python
 rate = c.get_rate("BTC", "USD")
-print(rate)  # 55862.0
+print(f"1 BTC = {rate} USD")
 ```
 
----
-
-### `rate_at(on_date, from_currency, to_currency) → float`
-
-Исторический курс на конкретную дату.
+### Исторический курс
 
 ```python
 from datetime import date
-from app import Converter
-
-c = Converter()
 rate = c.rate_at(date(2023, 1, 1), "USD", "EUR")
-print(f"USD/EUR на 1 января 2023: {rate}")
+print(f"USD/EUR на 01.01.2023: {rate}")
 ```
-
-> Поддерживается провайдерами `CurrencyAPIProvider` и `FrankfurterProvider`.
 
 ---
 
-### `invalidate_cache()`
+## Все методы
 
-Сбросить кэш, чтобы следующий запрос получил свежие курсы.
+### `Converter(provider=None, cache_ttl=3600)`
 
 ```python
-c.invalidate_cache()
+from converte_wallet import Converter
+from converte_wallet.providers import CoinGeckoProvider
+
+c = Converter()                           # по умолчанию: CurrencyAPIProvider
+c = Converter(provider=CoinGeckoProvider())  # конкретный провайдер
+c = Converter(cache_ttl=600)              # кэш на 10 минут
+c = Converter(cache_ttl=0)               # без кэша
+```
+
+### `convert(amount, from_currency, to_currency) → ConversionResult`
+
+```python
+c.convert(100, "USD", "EUR")
+c.convert(1,   "rub", "btc")   # регистр не важен
+c.convert(0.001, "BTC", "RUB")
+```
+
+### `convert_many(conversions) → List[ConversionResult]`
+
+```python
+c.convert_many([
+    (100, "USD", "EUR"),
+    (1, "BTC", "RUB"),
+])
+```
+
+### `get_rate(from_currency, to_currency) → float`
+
+```python
+rate = c.get_rate("USD", "RUB")  # 90.5
+```
+
+### `rate_at(on_date, from_currency, to_currency) → float`
+
+```python
+from datetime import date
+c.rate_at(date(2024, 6, 15), "EUR", "USD")
+```
+
+### `invalidate_cache()`
+
+```python
+c.invalidate_cache()  # сбросить кэш, следующий запрос будет свежим
 ```
 
 ---
 
 ## Провайдеры курсов
 
-Провайдер — это источник курсов. Можно использовать готовые или написать свой.
+| Провайдер | Валюты | Крипта | Ключ | История |
+|---|---|---|---|---|
+| `CurrencyAPIProvider` | 150+ | ✅ | Не нужен | ✅ |
+| `FrankfurterProvider` | ~33 фиат | ❌ | Не нужен | ✅ |
+| `CoinGeckoProvider` | фиат + крипта | ✅ | Не нужен | ❌ |
+| `StaticProvider` | любые | ✅ | — | ❌ |
 
-### CurrencyAPIProvider (по умолчанию)
+### CurrencyAPIProvider — по умолчанию
 
 ```python
-from app.providers import CurrencyAPIProvider
+from converte_wallet.providers import CurrencyAPIProvider
 
-provider = CurrencyAPIProvider()
+c = Converter(provider=CurrencyAPIProvider())
 ```
 
-- Источник: [github.com/fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api)
-- **Бесплатно**, API-ключ не нужен
-- **150+ валют**: все основные фиат + BTC, ETH, SOL, BNB, DOGE, ADA и др.
-- Поддерживает исторические курсы
-- CDN-кэширование на стороне провайдера, лимитов практически нет
+Источник: [github.com/fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api). Бесплатно, CDN, лимитов нет. Поддерживает USD, EUR, RUB, GBP, BTC, ETH, SOL, BNB, DOGE и 140+ других.
 
----
-
-### FrankfurterProvider
+### FrankfurterProvider — данные ЕЦБ
 
 ```python
-from app.providers import FrankfurterProvider
+from converte_wallet.providers import FrankfurterProvider
 
 c = Converter(provider=FrankfurterProvider())
 ```
 
-- Источник: [frankfurter.app](https://www.frankfurter.app) — данные ЕЦБ
-- **Бесплатно**, ключ не нужен
-- ~33 фиатные валюты (EUR, USD, GBP, JPY, CNY, ...)
-- **Не поддерживает**: RUB (отключён ЕЦБ в 2022), крипту
-- Поддерживает исторические курсы
+Источник: [frankfurter.app](https://www.frankfurter.app). Высокая надёжность для EUR-пар. Не поддерживает RUB (отключён ЕЦБ) и крипту.
 
----
-
-### CoinGeckoProvider
+### CoinGeckoProvider — фокус на крипте
 
 ```python
-from app.providers import CoinGeckoProvider
+from converte_wallet.providers import CoinGeckoProvider
 
 c = Converter(provider=CoinGeckoProvider())
 ```
 
-- Источник: [coingecko.com](https://www.coingecko.com)
-- **Бесплатно**, ключ не нужен (лимит ~10–30 запросов/мин)
-- Фокус на криптовалютах: BTC, ETH, SOL, BNB, DOGE, ADA, TON, ...
-- Также поддерживает фиат: USD, EUR, RUB, GBP и др.
+Источник: [coingecko.com](https://www.coingecko.com). Бесплатно, ~30 запросов/мин. BTC, ETH, SOL, TON, BNB, DOGE, ADA, XRP и другие.
 
----
-
-### StaticProvider (для тестов и офлайн)
+### StaticProvider — офлайн / тесты
 
 ```python
-from app.providers import StaticProvider
+from converte_wallet.providers import StaticProvider
 
-provider = StaticProvider({
-    "USD": {
-        "EUR": 0.92,
-        "RUB": 90.0,
-        "BTC": 0.000022,
-    }
-})
-c = Converter(provider=provider)
+c = Converter(provider=StaticProvider({
+    "USD": {"EUR": 0.92, "RUB": 90.0, "BTC": 0.000022}
+}))
+# Обратный курс считается автоматически: EUR→USD тоже работает
 ```
 
-- Курсы задаются вручную — никакой сети не нужно
-- Обратный курс считается автоматически: если есть USD→EUR, то EUR→USD тоже работает
-- Идеально для юнит-тестов
-
----
-
-### Написать свой провайдер
-
-Достаточно унаследоваться от `BaseProvider` и реализовать один метод:
+### Свой провайдер
 
 ```python
-from app.providers import BaseProvider
+from converte_wallet.providers import BaseProvider
 from typing import Dict
 
 class MyProvider(BaseProvider):
-    name = "my-provider"
+    name = "my-source"
 
     def get_rates(self, base: str) -> Dict[str, float]:
-        # base — код базовой валюты в верхнем регистре, например "USD"
-        # вернуть словарь: {код валюты: курс}
-        # пример: {"EUR": 0.92, "RUB": 90.0, "USD": 1.0}
-        rates = fetch_from_my_api(base)
-        return rates
+        # base — код в верхнем регистре: "USD", "BTC", ...
+        # вернуть: {"EUR": 0.92, "RUB": 90.0, ...}
+        return fetch_from_my_api(base)
 
 c = Converter(provider=MyProvider())
 ```
 
 ---
 
-## Объект ConversionResult
-
-Метод `convert()` возвращает объект `ConversionResult`, а не просто число.
-
-| Поле | Тип | Описание |
-|---|---|---|
-| `amount` | `float` | Итоговая сумма в целевой валюте |
-| `rate` | `float` | Курс: сколько `to_currency` за 1 `from_currency` |
-| `from_currency` | `str` | Исходная валюта (всегда uppercase) |
-| `to_currency` | `str` | Целевая валюта (всегда uppercase) |
-| `provider` | `str` | Название провайдера |
-| `fetched_at` | `datetime` | Время получения курса |
-| `cached` | `bool` | Был ли результат из кэша |
+## ConversionResult
 
 ```python
 result = c.convert(100, "USD", "EUR")
 
-# Использовать значение
-print(result.amount)   # 85.75
-print(result.rate)     # 0.8575
+result.amount        # float — итоговая сумма в EUR
+result.rate          # float — курс: 1 USD = ? EUR
+result.from_currency # "USD"
+result.to_currency   # "EUR"
+result.provider      # "currency-api"
+result.fetched_at    # datetime UTC
+result.cached        # bool — из кэша или нет
 
-# Преобразовать в словарь (удобно для JSON/API-ответов)
-data = result.to_dict()
-# {
-#   "amount": 85.75,
-#   "rate": 0.8575,
-#   "from_currency": "USD",
-#   "to_currency": "EUR",
-#   "provider": "currency-api",
-#   "fetched_at": "2026-04-09T14:00:00+00:00",
-#   "cached": False
-# }
-
-import json
-print(json.dumps(result.to_dict(), indent=2))
+str(result)          # "85.75 EUR  (1 USD = 0.8575 EUR, via currency-api)"
+result.to_dict()     # dict — удобно для JSON/API-ответов
 ```
 
 ---
 
 ## Кэширование
 
-По умолчанию курсы кэшируются на 1 час в памяти. Это означает что за час делается только 1 HTTP-запрос на каждую пару валют — не важно сколько раз вызвать `convert()`.
-
 ```python
-# Кэш на 5 минут
-c = Converter(cache_ttl=300)
+c = Converter(cache_ttl=3600)   # 1 час (по умолчанию)
+c = Converter(cache_ttl=300)    # 5 минут
+c = Converter(cache_ttl=86400)  # 24 часа
+c = Converter(cache_ttl=0)      # без кэша
 
-# Кэш на 24 часа
-c = Converter(cache_ttl=86400)
-
-# Без кэша (каждый раз свежий запрос к API)
-c = Converter(cache_ttl=0)
-
-# Принудительно сбросить кэш в любой момент
-c.invalidate_cache()
+c.invalidate_cache()            # сбросить вручную
 ```
 
 ---
 
-## CLI — командная строка
+## CLI
 
-После `pip install -e .` доступна команда `converte`:
+После установки доступна команда `converte`:
 
 ```bash
 converte 100 USD EUR
@@ -394,98 +278,82 @@ converte 100 USD EUR
 converte 1 RUB BTC
 # 0.00000018 BTC  (1 RUB = 1.79e-07 BTC, via currency-api)
 
-converte 1 BTC RUB
-# 5586205.94 RUB  (1 BTC = 5586206 RUB, via currency-api)
-```
-
-Выбор провайдера:
-
-```bash
+converte 0.5 ETH USD --provider coingecko
 converte 100 USD EUR --provider frankfurter
-converte 1 ETH USD  --provider coingecko
-```
-
-Без установки пакета — через Python:
-
-```bash
-python -m app.cli 100 USD EUR
-python -m app.cli 1 RUB BTC
 ```
 
 ---
 
-## Использование в проектах
+## Интеграция в проекты
 
 ### FastAPI
 
 ```python
 from fastapi import FastAPI
-from app import Converter
+from converte_wallet import Converter
 
 app = FastAPI()
-converter = Converter()  # создаём один раз при старте
+converter = Converter()
 
 @app.get("/convert")
 def convert(amount: float, from_currency: str, to_currency: str):
-    result = converter.convert(amount, from_currency, to_currency)
-    return result.to_dict()
+    return converter.convert(amount, from_currency, to_currency).to_dict()
 ```
 
 ### Telegram-бот (aiogram)
 
 ```python
-from aiogram import Router
-from app import Converter
+from converte_wallet import Converter
 
-router = Router()
 converter = Converter()
 
 @router.message()
 async def handle(message):
-    # ожидаем формат: "100 USD EUR"
-    parts = message.text.split()
+    parts = message.text.split()  # "100 USD EUR"
     if len(parts) == 3:
-        amount, fc, tc = float(parts[0]), parts[1], parts[2]
-        result = converter.convert(amount, fc, tc)
+        result = converter.convert(float(parts[0]), parts[1], parts[2])
         await message.answer(str(result))
 ```
 
-### Скрипт / CLI-утилита
-
-```python
-from app import Converter
-
-c = Converter()
-
-# портфель в разных валютах -> итого в USD
-portfolio = {"BTC": 0.05, "ETH": 1.2, "RUB": 50000}
-total_usd = sum(c.convert(amount, currency, "USD").amount
-                for currency, amount in portfolio.items())
-print(f"Итого: ${total_usd:.2f}")
-```
-
-### Jupyter / pandas
+### Pandas / Jupyter
 
 ```python
 import pandas as pd
-from app import Converter
+from converte_wallet import Converter
 
 c = Converter()
-currencies = ["EUR", "RUB", "GBP", "JPY", "BTC", "ETH"]
-data = [c.convert(1, "USD", cur).to_dict() for cur in currencies]
-df = pd.DataFrame(data)[["to_currency", "rate"]]
-print(df)
+currencies = ["EUR", "RUB", "GBP", "BTC", "ETH", "SOL"]
+df = pd.DataFrame([c.convert(1, "USD", cur).to_dict() for cur in currencies])
+print(df[["to_currency", "rate"]])
+```
+
+### Портфель в одной валюте
+
+```python
+from converte_wallet import Converter
+
+c = Converter()
+portfolio = {"BTC": 0.05, "ETH": 1.2, "RUB": 50000, "USD": 200}
+total = sum(c.convert(amount, cur, "USD").amount for cur, amount in portfolio.items())
+print(f"Портфель: ${total:.2f}")
 ```
 
 ---
 
-## Разработка и тесты
+## Разработка
+
+```bash
+git clone https://github.com/Shivarin/converte_wallet.git
+cd converte_wallet
+pip install -e .
+```
 
 ### Запуск тестов
 
 ```bash
 pip install pytest
 python -m pytest tests/ -v
+# 20 passed
 ```
 
 ### Запуск демо
@@ -494,48 +362,30 @@ python -m pytest tests/ -v
 python main.py
 ```
 
-### Добавить новый провайдер
-
-1. Создать файл `app/providers/my_provider.py`
-2. Унаследовать от `BaseProvider`, реализовать `get_rates()`
-3. Добавить в `app/providers/__init__.py`
-
-### Поддерживаемые валюты (примеры)
-
-**Фиат:** USD, EUR, RUB, GBP, JPY, CNY, KRW, INR, BRL, CAD, AUD, CHF, TRY, PLN, UAH и 100+ других
-
-**Крипто (через CurrencyAPIProvider):** BTC, ETH, BNB, SOL, XRP, DOGE, ADA, AVAX, DOT, SHIB, LTC, TRX, UNI, LINK, TON, USDT, USDC и многие другие
-
 ---
 
-## Структура проекта
+## Структура
 
 ```
 converte_wallet/
 ├── app/
-│   ├── __init__.py         # Converter, ConversionResult, MemoryCache
-│   ├── converter.py        # основной класс Converter
-│   ├── models.py           # ConversionResult
-│   ├── cache.py            # MemoryCache с TTL
-│   ├── cli.py              # CLI entrypoint
+│   ├── converter.py          # Converter
+│   ├── models.py             # ConversionResult
+│   ├── cache.py              # MemoryCache
+│   ├── cli.py                # CLI
 │   └── providers/
-│       ├── __init__.py     # экспорт всех провайдеров
-│       ├── base.py         # BaseProvider — базовый класс
-│       ├── static.py       # StaticProvider (офлайн/тесты)
-│       ├── currency_api.py # CurrencyAPIProvider (дефолт, 150+ валют)
-│       ├── frankfurter.py  # FrankfurterProvider (ECB данные)
-│       └── coingecko.py    # CoinGeckoProvider (крипто)
-├── tests/
-│   ├── test_converter.py   # 14 тестов конвертера
-│   └── test_providers.py   # 6 тестов провайдеров
-├── main.py                 # демо запуска
-├── pyproject.toml          # метаданные пакета
-├── requirements            # зависимости
-└── README.md
+│       ├── base.py           # BaseProvider
+│       ├── currency_api.py   # CurrencyAPIProvider (дефолт)
+│       ├── frankfurter.py    # FrankfurterProvider
+│       ├── coingecko.py      # CoinGeckoProvider
+│       └── static.py         # StaticProvider
+└── tests/
+    ├── test_converter.py     # 14 тестов
+    └── test_providers.py     # 6 тестов
 ```
 
 ---
 
 ## Лицензия
 
-MIT
+MIT © [Shivarin](https://github.com/Shivarin)
